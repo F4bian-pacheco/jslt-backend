@@ -1,0 +1,14 @@
+[MASTER]
+# Add the backend directory to the Python path
+init-hook='import sys; sys.path.append(".")'
+
+[MESSAGES CONTROL]
+# Disable specific warnings if needed
+disable=
+    missing-module-docstring,
+    missing-function-docstring,
+    missing-class-docstring
+
+[DESIGN]
+# Maximum number of return statements
+max-returns=10
