@@ -1,4 +1,5 @@
 """Evaluator for literal values (strings, numbers, booleans, null)."""
+
 from typing import Any, Dict, Optional
 from .base_evaluator import BaseEvaluator
 from ..utils.expression_parser import ExpressionParser
@@ -46,4 +47,4 @@ class LiteralEvaluator(BaseEvaluator):
     @property
     def priority(self) -> int:
         """Return priority for literal evaluation."""
-        return 40
+        return 110  # Higher than VariableEvaluator (100) to handle true/false/null before variable lookup

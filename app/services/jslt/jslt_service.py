@@ -1,4 +1,5 @@
 """Refactored JSLT service using evaluator pattern."""
+
 import time
 from typing import Any, Dict, List, Optional
 from app.models.transform import TransformResponse, JSLTValidationResponse
@@ -92,8 +93,7 @@ class JSLTService:
         try:
             # Reset variables for each transform
             self.variables = {}
-            result = self._evaluate_expression(
-                jslt_expression.strip(), input_json, {})
+            result = self._evaluate_expression(jslt_expression.strip(), input_json, {})
             execution_time = (time.perf_counter() - start_time) * 1000
 
             return TransformResponse(
@@ -123,7 +123,7 @@ class JSLTService:
                 "name": "John Doe",
                 "age": 25,
                 "city": "New York",
-                "skills": ["JavaScript", "Python", "Java"]
+                "skills": ["JavaScript", "Python", "Java"],
             }
             self.variables = {}  # Reset variables for validation
             self._evaluate_expression(jslt_expression.strip(), test_input, {})
@@ -186,19 +186,26 @@ class JSLTService:
         """
         import re
 
-        lines = expression.split('\n')
         current_variables = variables.copy()
 
-        # Process let statements first
-        let_statements = []
-        object_lines = []
+        # Split expression into let statements and the rest
+        # Process let statements first, then evaluate the remaining expression
+        lines = expression.split("\n")
 
-        for line in lines:
-            line = line.strip()
-            if line.startswith("let "):
-                let_statements.append(line)
-            elif line:
-                object_lines.append(line)
+        let_statements = []
+        remaining_start_idx = 0
+
+        for idx, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith("let "):
+                let_statements.append(stripped)
+                remaining_start_idx = idx + 1
+            elif stripped and not stripped.startswith("let "):
+                # Found a non-let, non-empty statement, stop looking for lets
+                break
+            elif not stripped:
+                # Empty line, keep track but continue looking for more lets
+                remaining_start_idx = idx + 1
 
         # Evaluate let statements
         for let_stmt in let_statements:
@@ -206,11 +213,14 @@ class JSLTService:
             if let_match:
                 var_name, value_expr = let_match.groups()
                 value = self._evaluate_expression(
-                    value_expr.strip(), context, current_variables)
+                    value_expr.strip(), context, current_variables
+                )
                 current_variables[var_name] = value
 
-        # Evaluate the remaining expression (usually an object)
-        remaining_expr = '\n'.join(object_lines)
+        # Get the remaining expression (everything after let statements)
+        remaining_lines = lines[remaining_start_idx:]
+        remaining_expr = "\n".join(remaining_lines).strip()
+
         if remaining_expr:
             return self._evaluate_expression(remaining_expr, context, current_variables)
 
@@ -230,15 +240,18 @@ class JSLTService:
 
         if "Unknown function" in error_msg:
             available_functions = ", ".join(
-                [f"{name}()" for name in self.functions.keys()])
+                [f"{name}()" for name in self.functions.keys()]
+            )
             suggestions.append(f"Available functions: {available_functions}")
 
         if "Invalid expression" in error_msg:
-            suggestions.extend([
-                "Use .field to access object properties",
-                "Use .array[0] to access array elements",
-                "Use {} for object construction",
-                "Use [] for array construction",
-            ])
+            suggestions.extend(
+                [
+                    "Use .field to access object properties",
+                    "Use .array[0] to access array elements",
+                    "Use {} for object construction",
+                    "Use [] for array construction",
+                ]
+            )
 
         return suggestions

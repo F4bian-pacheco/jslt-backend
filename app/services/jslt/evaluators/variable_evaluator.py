@@ -1,4 +1,5 @@
 """Evaluator for variable references and let statements."""
+
 import re
 from typing import Any, Dict, Optional, TYPE_CHECKING
 from .base_evaluator import BaseEvaluator
@@ -22,7 +23,21 @@ class VariableEvaluator(BaseEvaluator):
 
     def can_evaluate(self, expression: str, context: Any) -> bool:
         """Check if the expression is a variable reference or let statement."""
-        return expression.startswith("$") or expression.startswith("let ")
+        # Check if it's a variable reference starting with $
+        if expression.startswith("$"):
+            return True
+
+        # Check if it's a let statement
+        if expression.startswith("let "):
+            return True
+
+        # Check if it's a simple variable name (alphanumeric + underscore only)
+        # This should be checked last since it's more permissive
+        if re.match(r"^[a-zA-Z_]\w*$", expression):
+            # It's a simple identifier, could be a variable
+            return True
+
+        return False
 
     def evaluate(
         self,
@@ -34,13 +49,23 @@ class VariableEvaluator(BaseEvaluator):
         if variables is None:
             variables = {}
 
-        # Handle variable references
+        # Handle variable references starting with $
         if expression.startswith("$"):
             return self._evaluate_variable_reference(expression, variables)
 
         # Handle let statements
         if expression.startswith("let "):
             return self._evaluate_let_statement(expression, context, variables)
+
+        # Handle simple variable names (without $)
+        if re.match(r"^[a-zA-Z_]\w*$", expression):
+            # Check if it exists in variables
+            if expression in variables:
+                return variables[expression]
+            elif expression in self.service.variables:
+                return self.service.variables[expression]
+            else:
+                raise ValueError(f"Undefined variable: {expression}")
 
         raise ValueError(f"Invalid variable expression: {expression}")
 
@@ -94,7 +119,7 @@ class VariableEvaluator(BaseEvaluator):
             )
 
         var_name = let_match.group(1)
-        after_equals = expression[let_match.end():]
+        after_equals = expression[let_match.end() :]
 
         # Find where the value expression ends
         value_expr, rest_expr = ExpressionParser.split_let_expression(after_equals)

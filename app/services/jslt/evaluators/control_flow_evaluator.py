@@ -136,11 +136,13 @@ class ControlFlowEvaluator(BaseEvaluator):
     ) -> List[Any]:
         """Evaluate for loop expression."""
         # Pattern: for (array_expr) loop_expr
-        match = re.match(r"for\s*\(\s*([^)]+)\s*\)\s*(.+)", expression)
+        match = re.match(r"for\s*\(\s*([^)]+)\s*\)\s*(.+)", expression, re.DOTALL)
         if not match:
             raise ValueError("Invalid for loop syntax")
 
         array_expr, loop_expr = match.groups()
+
+        # Evaluate the array expression to get the array we'll iterate over
         array_value = self.service._evaluate_expression(
             array_expr.strip(), context, variables
         )
@@ -148,8 +150,10 @@ class ControlFlowEvaluator(BaseEvaluator):
         if not isinstance(array_value, list):
             raise ValueError("For loop requires an array")
 
+        # Evaluate the loop expression for each item in the array
         results = []
         for item in array_value:
+            # The loop expression should be evaluated with the current item as context
             result = self.service._evaluate_expression(
                 loop_expr.strip(), item, variables
             )

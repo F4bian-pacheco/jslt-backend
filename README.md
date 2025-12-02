@@ -47,13 +47,13 @@ backend/
 | Array construction | ✅ | Full support |
 | **Variables** | | |
 | `let` statements | ✅ | With proper scoping |
-| Variable references (`$var`) | ✅ | Full support |
+| Variable references (`$var` or `var`) | ✅ | Both syntaxes supported |
 | **Control Flow** | | |
 | `if-else` conditionals | ✅ | With optional else |
 | `for` array loops | ✅ | With filtering support |
 | Object `for` loops | ❌ | Not implemented |
 | **Operators** | | |
-| Arithmetic (`+`, `-`, `*`, `/`) | ✅ | Full support |
+| Arithmetic (`+`, `-`, `*`, `/`, `%`) | ✅ | Full support with precedence |
 | Comparison (`>`, `>=`, `<`, `<=`, `==`, `!=`) | ✅ | Full support |
 | Boolean (`and`, `or`, `not()`) | ✅ | Full support |
 | Pipe operator (`\|`) | ❌ | Not implemented |
@@ -71,7 +71,7 @@ backend/
 | Dynamic keys | ❌ | Not implemented |
 | Comments | ❌ | Not implemented |
 
-**Implementation Coverage:** ~40% of JSLT specification
+**Implementation Coverage:** ~45% of JSLT specification
 
 ### Architecture
 - **Clean Architecture**: Clear separation of concerns
@@ -427,14 +427,17 @@ else
 ```
 
 #### 8. **Operators**
-**Arithmetic:** `+`, `-`, `*`, `/`
+**Arithmetic:** `+`, `-`, `*`, `/`, `%` (with proper precedence)
 ```jslt
-.price * .quantity
+.price * .quantity - .discount  // Multiplication first, then subtraction = (100 * 2) - 10 = 190
+.total / .count                  // Division
+.number % 5                      // Modulo
 ```
 
 **Comparison:** `>`, `>=`, `<`, `<=`, `==`, `!=`
 ```jslt
 .age >= 18
+.status == "active"
 ```
 
 **String concatenation:**

@@ -1,7 +1,7 @@
 """Evaluator for operator expressions (comparison, addition, etc.)."""
+
 from typing import Any, Dict, Optional, Union, TYPE_CHECKING
 from .base_evaluator import BaseEvaluator
-from ..utils.expression_parser import ExpressionParser
 
 if TYPE_CHECKING:
     from ..jslt_service import JSLTService
@@ -30,11 +30,15 @@ class OperatorEvaluator(BaseEvaluator):
             return False
 
         # Check for comparison operators at the top level
-        if self._has_top_level_operator(expression, [" >= ", " <= ", " > ", " < ", " == ", " != "]):
+        if self._has_top_level_operator(
+            expression, [" >= ", " <= ", " > ", " < ", " == ", " != "]
+        ):
             return True
 
-        # Check for addition operator at the top level
-        if self._has_top_level_operator(expression, [" + "]):
+        # Check for arithmetic operators at the top level
+        if self._has_top_level_operator(
+            expression, [" + ", " - ", " * ", " / ", " % "]
+        ):
             return True
 
         return False
@@ -46,7 +50,7 @@ class OperatorEvaluator(BaseEvaluator):
         string_char = None
 
         for i, char in enumerate(expression):
-            if not in_string and char in '"\'':
+            if not in_string and char in "\"'":
                 in_string = True
                 string_char = char
             elif in_string and char == string_char:
@@ -60,7 +64,7 @@ class OperatorEvaluator(BaseEvaluator):
                 elif depth == 0:
                     # Check if any operator matches at this position
                     for op in operators:
-                        if expression[i:i+len(op)] == op:
+                        if expression[i : i + len(op)] == op:
                             return True
 
         return False
@@ -89,9 +93,15 @@ class OperatorEvaluator(BaseEvaluator):
         if " != " in expression:
             return self._evaluate_comparison(expression, context, "!=", variables)
 
-        # Handle string/number concatenation/addition
-        if " + " in expression:
-            return self._evaluate_addition(expression, context, variables)
+        # Handle arithmetic operations
+        # Check if we have additive operators (lower precedence)
+        # If so, we need to handle precedence correctly
+        if self._has_top_level_operator(expression, [" + ", " - "]):
+            return self._evaluate_additive(expression, context, variables)
+
+        # Otherwise, check for multiplicative operators (higher precedence)
+        if " * " in expression or " / " in expression or " % " in expression:
+            return self._evaluate_multiplicative(expression, context, variables)
 
         raise ValueError(f"Invalid operator expression: {expression}")
 
@@ -137,44 +147,158 @@ class OperatorEvaluator(BaseEvaluator):
 
         return False
 
-    def _evaluate_addition(
+    def _evaluate_multiplicative(
+        self, expression: str, context: Any, variables: Dict[str, Any]
+    ) -> Union[int, float]:
+        """Evaluate multiplicative operations (*, /, %)."""
+        # Process left to right for operators of same precedence
+        result = None
+        current_expr = ""
+        current_op = None
+
+        i = 0
+        while i < len(expression):
+            # Check for operators
+            if i < len(expression) - 2:
+                op_check = expression[i : i + 3]
+                if op_check in [" * ", " / ", " % "]:
+                    # Evaluate the accumulated expression
+                    if current_expr:
+                        val = self.service._evaluate_expression(
+                            current_expr.strip(), context, variables
+                        )
+                        if result is None:
+                            result = val
+                        else:
+                            # Apply the previous operator
+                            if current_op == "*":
+                                result = result * val
+                            elif current_op == "/":
+                                result = result / val if val != 0 else None
+                            elif current_op == "%":
+                                result = result % val if val != 0 else None
+
+                    current_op = op_check.strip()
+                    current_expr = ""
+                    i += 3
+                    continue
+
+            current_expr += expression[i]
+            i += 1
+
+        # Evaluate the last part
+        if current_expr:
+            val = self.service._evaluate_expression(
+                current_expr.strip(), context, variables
+            )
+            if result is None:
+                result = val
+            else:
+                if current_op == "*":
+                    result = result * val
+                elif current_op == "/":
+                    result = result / val if val != 0 else None
+                elif current_op == "%":
+                    result = result % val if val != 0 else None
+
+        return result
+
+    def _evaluate_additive(
         self, expression: str, context: Any, variables: Dict[str, Any]
     ) -> Union[str, int, float]:
-        """Evaluate addition/concatenation expression."""
-        # Split by " + " but be careful with nested expressions
-        parts = ExpressionParser.split_addition_parts(expression)
-        if len(parts) == 1:
-            return self.service._evaluate_expression(
-                parts[0].strip(), context, variables
-            )
+        """Evaluate additive operations (+, -)."""
+        # Process left to right for operators of same precedence
+        result = None
+        current_expr = ""
+        current_op = None
+        is_string_concat = False
 
-        # Evaluate all parts
-        values = []
-        for part in parts:
-            val = self.service._evaluate_expression(
-                part.strip(), context, variables
-            )
-            values.append(val)
+        i = 0
+        while i < len(expression):
+            # Check for operators
+            if i < len(expression) - 2:
+                op_check = expression[i : i + 3]
+                if op_check in [" + ", " - "]:
+                    # Evaluate the accumulated expression
+                    # This might contain multiplicative operations
+                    if current_expr:
+                        expr_stripped = current_expr.strip()
+                        # Check if it contains multiplicative operators
+                        if any(op in expr_stripped for op in [" * ", " / ", " % "]):
+                            val = self._evaluate_multiplicative(
+                                expr_stripped, context, variables
+                            )
+                        else:
+                            val = self.service._evaluate_expression(
+                                expr_stripped, context, variables
+                            )
 
-        # If any value is a string, do string concatenation
-        if any(isinstance(v, str) for v in values):
-            result = ""
-            for val in values:
-                result += str(val if val is not None else "")
-            return result
+                        # Check if we're doing string concatenation
+                        if isinstance(val, str):
+                            is_string_concat = True
 
-        # If all are numbers, do numeric addition
-        if all(isinstance(v, (int, float)) for v in values if v is not None):
-            result = 0
-            for val in values:
-                if val is not None:
-                    result += val
-            return result
+                        if result is None:
+                            result = val
+                        else:
+                            # Apply the previous operator
+                            if is_string_concat:
+                                # String concatenation
+                                result = str(
+                                    result if result is not None else ""
+                                ) + str(val if val is not None else "")
+                            else:
+                                # Numeric operation
+                                if current_op == "+":
+                                    result = (result if result is not None else 0) + (
+                                        val if val is not None else 0
+                                    )
+                                elif current_op == "-":
+                                    result = (result if result is not None else 0) - (
+                                        val if val is not None else 0
+                                    )
 
-        # Default: string concatenation
-        result = ""
-        for val in values:
-            result += str(val if val is not None else "")
+                    current_op = op_check.strip()
+                    current_expr = ""
+                    i += 3
+                    continue
+
+            current_expr += expression[i]
+            i += 1
+
+        # Evaluate the last part
+        if current_expr:
+            expr_stripped = current_expr.strip()
+            # Check if it contains multiplicative operators
+            if any(op in expr_stripped for op in [" * ", " / ", " % "]):
+                val = self._evaluate_multiplicative(expr_stripped, context, variables)
+            else:
+                val = self.service._evaluate_expression(
+                    expr_stripped, context, variables
+                )
+
+            # Check if we're doing string concatenation
+            if isinstance(val, str):
+                is_string_concat = True
+
+            if result is None:
+                result = val
+            else:
+                if is_string_concat:
+                    # String concatenation
+                    result = str(result if result is not None else "") + str(
+                        val if val is not None else ""
+                    )
+                else:
+                    # Numeric operation
+                    if current_op == "+":
+                        result = (result if result is not None else 0) + (
+                            val if val is not None else 0
+                        )
+                    elif current_op == "-":
+                        result = (result if result is not None else 0) - (
+                            val if val is not None else 0
+                        )
+
         return result
 
     @property
