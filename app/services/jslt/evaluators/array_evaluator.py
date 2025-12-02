@@ -1,4 +1,5 @@
 """Evaluator for array construction."""
+
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 from .base_evaluator import BaseEvaluator
 from ..utils.expression_parser import ExpressionParser
@@ -21,7 +22,16 @@ class ArrayEvaluator(BaseEvaluator):
 
     def can_evaluate(self, expression: str, context: Any) -> bool:
         """Check if the expression is an array construction."""
-        return expression.startswith("[") and expression.endswith("]")
+        # Check if it's an array but NOT a for loop (which also uses brackets)
+        if not (expression.startswith("[") and expression.endswith("]")):
+            return False
+
+        # If it starts with [for, it should be handled by ControlFlowEvaluator
+        content = expression[1:-1].strip()
+        if content.startswith("for"):
+            return False
+
+        return True
 
     def evaluate(
         self,
