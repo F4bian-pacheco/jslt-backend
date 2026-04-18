@@ -40,9 +40,9 @@ backend/
 |---------|--------|-------|
 | **Core Features** | | |
 | Dot accessors (`.field`) | ✅ | Fully supported |
-| Array indexing (`[0]`) | ✅ | Positive indices only |
-| Array slicing (`[1:3]`) | ❌ | Not implemented |
-| Negative indexing (`[-1]`) | ❌ | Not implemented |
+| Array indexing (`[0]`) | ✅ | Includes negative indices (`[-1]`) |
+| Array slicing (`[1:3]`) | ✅ | Supports `[start:end]`, `[:end]`, `[start:]`, negative bounds |
+| Negative indexing (`[-1]`) | ✅ | Fully supported for arrays |
 | Object construction | ✅ | Full support |
 | Array construction | ✅ | Full support |
 | **Variables** | | |
@@ -63,6 +63,10 @@ backend/
 | `number()` | ✅ | Type conversion |
 | `boolean()` | ✅ | Type conversion |
 | `round()` | ✅ | Math function |
+| `lowercase()`, `uppercase()`, `trim()` | ✅ | String transformation helpers |
+| `split()`, `join()` | ✅ | String/array conversion helpers |
+| `flatten()`, `all()`, `any()` | ✅ | Array utility helpers |
+| `floor()`, `ceiling()`, `min()`, `max()` | ✅ | Numeric utility helpers |
 | Other built-in functions | ❌ | ~50+ functions missing |
 | **Advanced** | | |
 | Function declarations (`def`) | ❌ | Not implemented |
@@ -151,6 +155,18 @@ Each evaluator handles a specific type of JSLT expression:
 - `number(value)` - Convert to number
 - `boolean(value)` - Convert to boolean
 - `round(number)` - Round to nearest integer
+- `lowercase(value)` - Convert to lowercase string
+- `uppercase(value)` - Convert to uppercase string
+- `trim(value)` - Trim surrounding whitespace
+- `split(value, separator)` - Split string into array
+- `join(array, separator)` - Join array into string
+- `flatten(array)` - Recursively flatten nested arrays
+- `all(array)` - True if all elements are truthy
+- `any(array)` - True if at least one element is truthy
+- `floor(number)` - Round down
+- `ceiling(number)` - Round up
+- `min(a, b, ...)` - Minimum numeric value
+- `max(a, b, ...)` - Maximum numeric value
 
 ### 🔌 Extensibility
 
@@ -195,7 +211,7 @@ service.register_evaluator(CustomEvaluator(service))
 ```
 
 ### Core Functionality
-- **Path expressions**: `.field`, `.array[0]`, `.nested.field`
+- **Path expressions**: `.field`, `.array[0]`, `.array[-1]`, `.array[1:3]`, `.nested.field`
 - **Object construction**: `{ "key": .value }`
 - **Array construction**: `[.item1, .item2]`
 - **Variable system**: `let variable = expression` and `$variable` references
